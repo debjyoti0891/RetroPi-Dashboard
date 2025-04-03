@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Raspberry Pi Dashboard</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700&display=swap');
+        body {
+            background-color: black;
+            color: white;
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+        .container {
+            width: 320px;
+            height: 300px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 1.2em;
+            padding: 5px;
+        }
+        .clock {
+            font-size: 2.5em;
+            font-weight: bold;
+            font-family: 'Orbitron', sans-serif;
+        }
+        .system {
+            display: flex;
+            flex-direction: column;
+            font-size: 0.9em;
+        }
+        .load-bar {
+            background-color: grey;
+            height: 10px;
+            width: 100px;
+            margin: 5px auto;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        .load-bar div {
+            height: 100%;
+            background-color: limegreen;
+        }
+        .bus-train {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9em;
+            padding: 5px;
+            text-align: left;
+        }
+        .train, .bus {
+            width: 48%;
+            padding: 5px;
+            border: 1px solid #444;
+            border-radius: 5px;
+            background-color: #222;
+        }
+        .train h4, .bus h4 {
+            margin: 0;
+            font-size: 1.2em;
+        }
+        .train ul, .bus ul {
+            padding-left: 10px;
+            list-style-type: none;
+        }
+        .train li, .bus li {
+            margin-bottom: 5px;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div id="time-icon"><i class="fas fa-moon"></i></div>
+            <div id="weather-icon"><i class="fas fa-cloud"></i></div>
+            <div id="weather">Loading...</div>
+        </div>
+        <div class="clock" id="clock">00:00</div>
+        <div class="system">
+            <div id="lan">LAN: Loading...</div>
+            <div id="wifi">WiFi: Loading...</div>
+            <div>Load:</div>
+            <div class="load-bar"><div id="load" style="width: 50%;"></div></div>
+            <div id="pihole">Pi-hole: Loading...</div>
+        </div>
+        <div class="bus-train">
+            <div class="bus">
+                <h4>BUS</h4>
+                <ul id="bus"></ul>
+            </div>
+            <div class="train">
+                <h4>TRAIN</h4>
+                <ul id="train"></ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function updateTime() {
+            let now = new Date();
+            let hours = now.getHours();
+            document.getElementById('clock').innerText = now.toLocaleTimeString('en-GB', {hour: '2-digit', minute: '2-digit'});
+            document.getElementById('time-icon').innerHTML = hours >= 6 && hours < 18 ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
+        }
+        setInterval(updateTime, 1000);
+        updateTime();
+
+        function fetchData() {
+            fetch('/data')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('weather').innerText = data.weather;
+                    document.getElementById('weather-icon').innerHTML = `<i class="fas ${data.weather_icon}"></i>`;
+                    document.getElementById('lan').innerText = "LAN: " + data.lan;
+                    document.getElementById('wifi').innerText = "WiFi: " + data.wifi;
+                    document.getElementById('load').style.width = data.load + "%";
+                    document.getElementById('pihole').innerText = "Pi-hole: " + data.pihole;
+                    document.getElementById('bus').innerHTML = data.bus.map(b => `<li>${b}</li>`).join('');
+                    document.getElementById('train').innerHTML = data.train.map(t => `<li>${t}</li>`).join('');
+                });
+        }
+        fetchData();
+        setInterval(fetchData, 60000);
+    </script>
+</body>
+</html>
