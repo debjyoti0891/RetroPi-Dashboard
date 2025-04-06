@@ -3,6 +3,8 @@ import requests
 import subprocess
 import psutil
 import json
+import datetime
+import pytz
 app = Flask(__name__)
 
 with open('api_keys.json') as f:
@@ -22,7 +24,77 @@ def data():
     train = get_train_schedule()
     uptime = get_system_uptime()
     lan_ip,wifi_status = get_network_info()
-    return jsonify(weather=weather, bus=bus, train=train, uptime=uptime, lan=lan_ip, wifi=wifi_status)
+    # Extracting specific weather data (icon, temp, sunrise, sunset)
+    weather_data = {
+        'description': weather['weather'][0]['description'],
+        'icon': weather['weather'][0]['icon'],
+        'temp': weather['main']['temp'],
+        'sunrise': get_local_time(weather['sys']['sunrise']),
+        'sunset': get_local_time(weather['sys']['sunset'])
+    }
+    pihole = get_pihole_status()
+    print(f'{jsonify(weather=weather_data, bus=bus, train=train, uptime=uptime, lan=lan_ip, wifi=wifi_status, pihole=pihole)}')
+    return jsonify(weather=weather_data, bus=bus, train=train, uptime=uptime, lan=lan_ip, wifi=wifi_status, pihole=pihole)
+
+
+import shutil
+import subprocess
+
+def get_pihole_status():
+    """
+    Checks if the 'pihole' command is available and if Pi-hole blocking is enabled.
+
+    Returns:
+        str: "Enabled" if Pi-hole command is found and blocking is enabled,
+             "NA" otherwise (not found, not enabled, or error).
+    """
+    # 1. Check if the 'pihole' command exists in the system's PATH
+    pihole_path = shutil.which('pihole')
+
+    if pihole_path is None:
+        # print("pihole command not found in PATH.")
+        return "NA"
+
+    try:
+        # 2. Run the 'pihole status' command
+        # Use the full path found by shutil.which for robustness
+        # Add a timeout (e.g., 10 seconds) to prevent hanging
+        result = subprocess.run(
+            [pihole_path, 'status'],
+            capture_output=True,  # Capture stdout and stderr
+            text=True,            # Decode output as text
+            check=False,          # Don't raise exception on non-zero exit code
+            timeout=10
+        )
+
+        # 3. Check the output for the specific string
+        # We check stdout specifically, as stderr might contain warnings
+        if result.stdout and 'Pi-hole blocking is enabled' in result.stdout:
+            return "Enabled"
+        else:
+            # String not found in stdout, or stdout was empty
+            # This covers cases where it's disabled or has unexpected output
+            # print(f"Pi-hole status output did not confirm enabled:\n{result.stdout}")
+            return "NA"
+
+    except FileNotFoundError:
+        # This shouldn't happen often if shutil.which found it, but good practice
+        # print(f"Error: pihole command not found at {pihole_path} despite shutil.which.")
+        return "NA"
+    except subprocess.TimeoutExpired:
+        print("Error: Timeout expired while running 'pihole status'.")
+        return "NA"
+    except Exception as e:
+        # Catch any other unexpected errors during subprocess execution
+        print(f"An unexpected error occurred while checking Pi-hole status: {e}")
+        return "NA"
+
+
+def get_local_time(t_string):
+  t_stamp = datetime.datetime.fromtimestamp(int(t_string), tz=pytz.UTC)
+  # Use the Brussels timezone
+  local_timezone = pytz.timezone('Europe/Brussels')
+  return f'{t_stamp.astimezone(local_timezone)}'
 
 def get_network_info():
     # Get network stats
@@ -50,13 +122,12 @@ def get_weather():
     url = f'https://api.openweathermap.org/data/2.5/weather?lat={50.8791}&lon={4.7025}&appid={OPENWEATHER_API_KEY}'
     response = requests.get(url)
     data = response.json()
-    print('weather',data)
+
     if response.status_code == 200:
-        temp = data['main']['temp']
-        description = data['weather'][0]['description']
-        return f"{temp}°C, {description.capitalize()}"
+        return data
     else:
-        return "Weather data unavailable"
+        print(response)
+        return None
 def format_connection_string(dirname, name, departure_time, departure_delay, widths):
   """Formats a connection string with fixed-width fields.
 
@@ -119,7 +190,7 @@ def get_train_schedule():
         if connections:
             all_conn = []
             for next_train in connections[:3]:
-              import datetime
+
               departure_time = datetime.datetime.fromtimestamp(int(next_train['departure']['time'])).strftime('%H:%M')
               departure_delay = int(next_train['departure']['delay']) // 60
               name = next_train['departure']['vehicleinfo']['shortname']

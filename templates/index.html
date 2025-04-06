@@ -15,7 +15,7 @@
         }
         .container {
             width: 320px;
-            height: 300px;
+            height: 350px;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
@@ -75,6 +75,27 @@
             margin-bottom: 5px;
             font-size: 0.9em;
         }
+        .weather-info {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .weather-info img {
+            width: 50px;
+            height: 50px;
+        }
+        .weather-info .temp {
+            font-size: 1.2em;
+            margin-top: 10px;
+        }
+        .sun-times {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+        }
+        .sun-times div {
+            font-size: 0.9em;
+        }
     </style>
 </head>
 <body>
@@ -85,6 +106,20 @@
             <div id="weather">Loading...</div>
         </div>
         <div class="clock" id="clock">00:00</div>
+        <div class="weather-info">
+            <div id="weather-icon-img">
+                <img src="" alt="weather icon" id="weather-icon-img">
+            </div>
+            <div id="temperature" class="temp">Temperature: Loading...</div>
+        </div>
+        <div class="sun-times">
+            <div id="sunrise">
+                <i class="fas fa-sun"></i> <span>Sunrise: Loading...</span>
+            </div>
+            <div id="sunset">
+                <i class="fas fa-sunset"></i> <span>Sunset: Loading...</span>
+            </div>
+        </div>
         <div class="system">
             <div id="lan">LAN: Loading...</div>
             <div id="wifi">WiFi: Loading...</div>
@@ -118,12 +153,24 @@
             fetch('/data')
                 .then(response => response.json())
                 .then(data => {
-                    document.getElementById('weather').innerText = data.weather;
-                    document.getElementById('weather-icon').innerHTML = `<i class="fas ${data.weather_icon}"></i>`;
+                    // Weather
+                    const weatherIconCode = data.weather.icon;
+                    const iconUrl = `https://openweathermap.org/img/wn/${weatherIconCode}.png`;
+                    document.getElementById('weather').innerText = data.weather.description;
+                    document.getElementById('weather-icon-img').src = iconUrl;
+                    document.getElementById('temperature').innerText = `Temperature: ${(data.weather.temp - 273.15).toFixed(2)}°C`;
+
+                    // Sunrise and Sunset
+                    document.getElementById('sunrise').innerHTML = `<i class="fas fa-sun"></i> Sunrise: ${data.weather.sunrise}`;
+                    document.getElementById('sunset').innerHTML = `<i class="fas fa-sunset"></i> Sunset: ${data.weather.sunset}`;
+
+                    // System Information
                     document.getElementById('lan').innerText = "LAN: " + data.lan;
                     document.getElementById('wifi').innerText = "WiFi: " + data.wifi;
                     document.getElementById('load').style.width = data.load + "%";
                     document.getElementById('pihole').innerText = "Pi-hole: " + data.pihole;
+
+                    // Bus and Train data
                     document.getElementById('bus').innerHTML = data.bus.map(b => `<li>${b}</li>`).join('');
                     document.getElementById('train').innerHTML = data.train.map(t => `<li>${t}</li>`).join('');
                 });
